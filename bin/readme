@@ -1,0 +1,2 @@
+Nếu sinh viên không thể truy cập được vào thư mục của mình, hãy đảm bảo thư mục user của bạn có quyền chạy với tất cả mội người, nếu không có thể sinh lỗi, hoặc phải cho vào thư mục home của hệ thống
+Ví dụ chmod o+x /home/quan
