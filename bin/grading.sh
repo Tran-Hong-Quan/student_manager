@@ -1,99 +1,106 @@
 #!/bin/bash
-
 # grading.sh
-# Usage: ./grading.sh <assignment_dir> <student_file>
+# Usage: sudo ./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
 
-assignment_dir="$1"
-student_file="$2"
+print_help() {
+    cat <<EOF
+Usage:
+  sudo ./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
 
-input_file="$assignment_dir/input.txt"
-output_file="$assignment_dir/output.txt"
+Description:
+  Script chấm bài tập cho sinh viên.
+  - <MãSV>: mã sinh viên (ví dụ: 12345)
+  - <BàiTập>: tên bài tập đã tạo trong hệ thống (tương ứng thư mục trong ../data/assignments)
+  - <FileBàiTậpSinhVien>: file bài tập .sh hoặc thực thi
+
+Workflow:
+  1. Lấy input/output chuẩn từ ../data/assignments/<BàiTập>
+  2. Chạy bài nộp với input đó
+  3. So sánh output với chuẩn để tính % số test đúng
+  4. Cập nhật điểm cao nhất vào lớp (nếu có quyền)
+EOF
+}
+
+# ==== Kiểm tra tham số ====
+if [[ "$1" == "--help" || $# -lt 3 ]]; then
+    print_help
+    exit 0
+fi
+
+MASV="$1"
+ASSIGNMENT="$2"
+STUDENT_FILE="$3"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="$SCRIPT_DIR/../data/classes"
+ASSIGNMENTS_DIR="$SCRIPT_DIR/../data/assignments"
 
-# ==== Lấy MãSV từ username (SV-12345) ====
-username=$(whoami)
-if [[ "$username" =~ ^SV-([A-Za-z0-9]+)$ ]]; then
-    masv="${BASH_REMATCH[1]}"
-else
-    masv=""
+ASSIGNMENT_DIR="$ASSIGNMENTS_DIR/$ASSIGNMENT"
+INPUT_FILE="$ASSIGNMENT_DIR/input.txt"
+OUTPUT_FILE="$ASSIGNMENT_DIR/output.txt"
+
+# ==== Kiểm tra bài tập ====
+if [[ ! -d "$ASSIGNMENT_DIR" ]]; then
+    echo "[ERR] Bài tập '$ASSIGNMENT' không tồn tại."
+    exit 1
 fi
 
-# ==== Kiểm tra tồn tại output chuẩn ====
-if [ ! -f "$output_file" ]; then
+if [[ ! -f "$OUTPUT_FILE" ]]; then
     echo "0.00"
     exit 0
 fi
 
 # ==== Đọc test cases ====
-if [ -f "$input_file" ]; then
-    mapfile -t inputs < "$input_file"
-else
-    inputs=(" ")
-fi
+mapfile -t inputs < "$INPUT_FILE"
+mapfile -t expected_outputs < "$OUTPUT_FILE"
 
-mapfile -t expected_outputs < "$output_file"
-
-total_cases=${#expected_outputs[@]}
-if [ $total_cases -eq 0 ]; then
+TOTAL=${#expected_outputs[@]}
+if [[ $TOTAL -eq 0 ]]; then
     echo "0.00"
     exit 0
 fi
 
-correct=0
+CORRECT=0
 
 for i in "${!expected_outputs[@]}"; do
-    input="${inputs[$i]}"
+    input_line="${inputs[$i]}"
     expected="${expected_outputs[$i]}"
 
-    # Nếu là file .sh
-    if [[ "$student_file" == *.sh ]]; then
-        actual=$(echo "$input" | bash "$student_file" 2>/dev/null)
+    # Tách input thành mảng tham số
+    read -r -a args <<< "$input_line"
+
+    # Chạy file sinh viên
+    if [[ "$STUDENT_FILE" == *.sh ]]; then
+        actual=$("$STUDENT_FILE" "${args[@]}" 2>/dev/null)
     else
-        # giả định file thực thi
-        actual=$(echo "$input" | "$student_file" 2>/dev/null)
+        actual=$("$STUDENT_FILE" "${args[@]}" 2>/dev/null)
     fi
 
-    # So sánh output (bỏ khoảng trắng 2 đầu)
+    # So sánh output, bỏ khoảng trắng đầu/cuối
     if [[ "$(echo "$actual" | xargs)" == "$(echo "$expected" | xargs)" ]]; then
-        correct=$((correct+1))
+        CORRECT=$((CORRECT+1))
     fi
 done
 
 # ==== Tính điểm ====
-score=$(echo "scale=4; $correct*100/$total_cases" | bc)
-printf "%.2f\n" "$score"
+SCORE=$(echo "scale=4; $CORRECT*100/$TOTAL" | bc)
+printf "%.2f\n" "$SCORE"
 
-# ==== Nếu có masv thì cập nhật điểm vào lớp ====
-if [[ -n "$masv" ]]; then
-    # Lấy tên bài tập = tên thư mục assignment
-    assignment_name=$(basename "$assignment_dir")
+# ==== Cập nhật điểm vào lớp ====
+for class_file in "$DATA_DIR"/*.csv; do
+    [[ ! -f "$class_file" ]] && continue
 
-    # Duyệt tất cả lớp để tìm sinh viên
-    for class_file in "$DATA_DIR"/*.csv; do
-        [[ ! -f "$class_file" ]] && continue
-
-        # Kiểm tra sinh viên có trong lớp này không
-        if grep -q "^$masv," "$class_file"; then
-            # Lấy cột của bài tập
-            col=$(head -n1 "$class_file" | tr ',' '\n' | grep -n "^$assignment_name$" | cut -d: -f1)
-
-            if [[ -n "$col" ]]; then
-                # Lấy điểm hiện tại
-                old_score=$(awk -F',' -v id="$masv" -v col="$col" '$1==id {print $col}' "$class_file")
-
-                # Nếu chưa có hoặc điểm mới cao hơn → cập nhật
-                if [[ -z "$old_score" || $(echo "$score > $old_score" | bc) -eq 1 ]]; then
-                    awk -F',' -v id="$masv" -v col="$col" -v new="$score" 'BEGIN{OFS=","} 
-                        NR==1{print $0; next} 
-                        $1==id{$col=new} {print $0}' "$class_file" > "$class_file.tmp" \
-                        && mv "$class_file.tmp" "$class_file"
-
-                    echo "[INFO] Đã cập nhật điểm cho SV-$masv trong lớp $(basename "$class_file" .csv)"
-                fi
+    if grep -q "^$MASV," "$class_file"; then
+        col=$(head -n1 "$class_file" | tr ',' '\n' | grep -n "^$ASSIGNMENT$" | cut -d: -f1)
+        if [[ -n "$col" ]]; then
+            old_score=$(awk -F',' -v id="$MASV" -v col="$col" '$1==id {print $col}' "$class_file")
+            if [[ -z "$old_score" || $(echo "$SCORE > $old_score" | bc) -eq 1 ]]; then
+                awk -F',' -v id="$MASV" -v col="$col" -v new="$SCORE" 'BEGIN{OFS=","}
+                    NR==1{print $0; next}
+                    $1==id{$col=new}1' "$class_file" > "$class_file.tmp" && mv "$class_file.tmp" "$class_file"
+                echo "[INFO] Cập nhật điểm SV-$MASV trong lớp $(basename "$class_file" .csv)"
             fi
         fi
-    done
-fi
+    fi
+done
 

@@ -1,224 +1,208 @@
 #!/bin/bash
-# class_manager.sh - Quản lý lớp học (CSV)
-# Lưu dữ liệu tại ../data/classes
-# Mỗi lớp là 1 file CSV: cột 1 là MãSV, các cột sau là điểm từng bài tập
+# class_manager.sh - Quản lý lớp học (CSV + assignments thư mục) với bảo mật chmod
+
+# ==== Kiểm tra quyền root ====
+if [[ $EUID -ne 0 ]]; then
+    echo "[ERR] Vui lòng chạy script với quyền root hoặc sudo."
+    exit 1
+fi
 
 # ==== Cấu hình ====
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="$SCRIPT_DIR/../data/classes"
+ASSIGN_DIR="$SCRIPT_DIR/../data/assignments"
 
-# ==== Tạo thư mục dữ liệu nếu chưa có ====
 mkdir -p "$DATA_DIR"
+mkdir -p "$ASSIGN_DIR"
 
-# ==== Hàm: Thêm lớp (tạo file CSV với tiêu đề MãSV) ====
-add_class() {
-    local class="$1"
-    local file="$DATA_DIR/$class.csv"
+# ==== Bảo mật thư mục và file ====
+secure_data_dirs() {
+    mkdir -p "$DATA_DIR" "$ASSIGN_DIR"
 
-    if [[ -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' đã tồn tại."
-        return
-    fi
+    # Quyền cho thư mục gốc
+    chmod 700 "$DATA_DIR" "$ASSIGN_DIR"
 
-    echo "MaSV" > "$file"
-    echo "[OK] Đã tạo lớp '$class' (CSV)."
+    # File CSV lớp
+    shopt -s nullglob
+    for f in "$DATA_DIR"/*.csv; do
+        chmod 600 "$f"
+    done
+    shopt -u nullglob
+
+    # Thư mục bài tập
+    shopt -s nullglob
+    for d in "$ASSIGN_DIR"/*; do
+        chmod 700 "$d"
+    done
+    shopt -u nullglob
 }
+secure_data_dirs
 
-# ==== Hàm: Xóa lớp ====
+# ==== Lớp ====
+add_class() {
+    local class="$1"; local file="$DATA_DIR/$class.csv"
+    [[ -f "$file" ]] && { echo "[ERR] Lớp '$class' đã tồn tại."; return; }
+    echo "MaSV" > "$file"
+    chmod 600 "$file"
+    echo "[OK] Đã tạo lớp '$class'."
+}
 delete_class() {
-    local class="$1"
-    local file="$DATA_DIR/$class.csv"
-
-    if [[ ! -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' không tồn tại."
-        return
-    fi
-
+    local class="$1"; local file="$DATA_DIR/$class.csv"
+    [[ ! -f "$file" ]] && { echo "[ERR] Lớp '$class' không tồn tại."; return; }
     rm "$file"
     echo "[OK] Đã xóa lớp '$class'."
 }
+list_classes() { ls "$DATA_DIR" 2>/dev/null | sed 's/.csv$//' | sort; }
 
-# ==== Hàm: Liệt kê lớp ====
-list_classes() {
-    ls "$DATA_DIR" | sed 's/.csv$//' | sort
-}
-
-# ==== Hàm: Thêm sinh viên vào lớp ====
+# ==== Sinh viên ====
 add_student_to_class() {
-    local class="$1"
-    local masv="$2"
+    local class="$1"; shift
     local file="$DATA_DIR/$class.csv"
+    [[ ! -f "$file" ]] && { echo "[ERR] Lớp '$class' không tồn tại."; return; }
 
-    if [[ ! -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' không tồn tại."
-        return
-    fi
-
-    if grep -q "^${masv}," "$file"; then
-        echo "[ERR] Sinh viên $masv đã có trong lớp '$class'."
-        return
-    fi
-
-    # Đếm số cột bài tập để thêm số lượng 0 tương ứng
-    local num_assignments
-    num_assignments=$(head -n1 "$file" | awk -F',' '{print NF-1}')
-
-    local zeros
-    zeros=$(yes 0 | head -n "$num_assignments" | tr '\n' ',' | sed 's/,$//')
-
-    if [[ -z "$zeros" ]]; then
-        echo "$masv" >> "$file"
-    else
-        echo "$masv,$zeros" >> "$file"
-    fi
-
-    echo "[OK] Đã thêm sinh viên $masv vào lớp '$class'."
+    for masv in "$@"; do
+        [[ -z "$masv" ]] && continue
+        if grep -q "^${masv}," "$file"; then
+            echo "[ERR] Sinh viên $masv đã có trong lớp '$class'."
+            continue
+        fi
+        local num_assignments=$(head -n1 "$file" | awk -F',' '{print NF-1}')
+        local zeros=$(yes 0 | head -n "$num_assignments" | tr '\n' ',' | sed 's/,$//')
+        [[ -z "$zeros" ]] && echo "$masv" >> "$file" || echo "$masv,$zeros" >> "$file"
+        echo "[OK] Thêm sinh viên $masv vào lớp '$class'."
+    done
+    chmod 600 "$file"
 }
-
-# ==== Hàm: Xóa sinh viên khỏi lớp ====
 remove_student_from_class() {
-    local class="$1"
-    local masv="$2"
+    local class="$1"; shift
     local file="$DATA_DIR/$class.csv"
+    [[ ! -f "$file" ]] && { echo "[ERR] Lớp '$class' không tồn tại."; return; }
 
-    if [[ ! -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' không tồn tại."
-        return
-    fi
-
-    if ! grep -q "^${masv}," "$file"; then
-        echo "[ERR] Sinh viên $masv không có trong lớp '$class'."
-        return
-    fi
-
-    grep -v "^${masv}," "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-    echo "[OK] Đã xóa sinh viên $masv khỏi lớp '$class'."
+    for masv in "$@"; do
+        [[ -z "$masv" ]] && continue
+        if ! grep -q "^${masv}," "$file"; then
+            echo "[ERR] Sinh viên $masv không có trong lớp '$class'."
+            continue
+        fi
+        grep -v "^${masv}," "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+        echo "[OK] Xóa sinh viên $masv khỏi lớp '$class'."
+    done
+    chmod 600 "$file"
 }
-
-# ==== Hàm: Liệt kê sinh viên trong lớp ====
 list_students_in_class() {
-    local class="$1"
-    local file="$DATA_DIR/$class.csv"
-
-    if [[ ! -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' không tồn tại."
-        return
-    fi
-
-    echo "[INFO] Danh sách sinh viên lớp '$class':"
+    local class="$1"; local file="$DATA_DIR/$class.csv"
+    [[ ! -f "$file" ]] && { echo "[ERR] Lớp '$class' không tồn tại."; return; }
     column -s, -t "$file"
 }
 
-# ==== Hàm: Thêm bài tập vào lớp ====
-add_assignment_to_class() {
-    local class="$1"
-    local assignment="$2"
+# ==== Assignment kho ====
+add_assignment() {
+    local assignment="$1"; local dir="$ASSIGN_DIR/$assignment"
+    [[ -d "$dir" ]] && { echo "[ERR] Bài tập '$assignment' đã tồn tại."; return; }
+    mkdir -p "$dir"; chmod 700 "$dir"
+    echo "[OK] Thêm bài tập '$assignment' vào kho."
+}
+remove_assignment() {
+    local assignment="$1"; local dir="$ASSIGN_DIR/$assignment"
+    [[ ! -d "$dir" ]] && { echo "[ERR] Bài tập '$assignment' không tồn tại."; return; }
+    rm -rf "$dir"
+    echo "[OK] Xóa bài tập '$assignment' khỏi kho."
+}
+list_assignments() { ls "$ASSIGN_DIR" 2>/dev/null | sort; }
+
+# ==== Giao/xóa bài tập lớp ====
+assign_to_class() {
+    local class="$1"; shift
     local file="$DATA_DIR/$class.csv"
+    [[ ! -f "$file" ]] && { echo "[ERR] Lớp '$class' không tồn tại."; return; }
 
-    if [[ ! -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' không tồn tại."
-        return
-    fi
+    for assignment in "$@"; do
+        [[ ! -d "$ASSIGN_DIR/$assignment" ]] && { echo "[ERR] Bài tập '$assignment' chưa có."; continue; }
+        if head -n1 "$file" | grep -q "$assignment"; then
+            echo "[ERR] Bài tập '$assignment' đã giao lớp '$class'."
+            continue
+        fi
+        sed -i "1s/$/,$assignment/" "$file"
+        tail -n +2 "$file" | while read -r line; do echo "$line,0"; done > "$file.tmp"
+        head -n1 "$file" > "$file.new"; cat "$file.tmp" >> "$file.new"; mv "$file.new" "$file"; rm -f "$file.tmp"
+        echo "[OK] Giao bài tập '$assignment' cho lớp '$class'."
+    done
+    chmod 600 "$file"
+}
+remove_assignment_from_class() {
+    local class="$1"; shift
+    local file="$DATA_DIR/$class.csv"
+    [[ ! -f "$file" ]] && { echo "[ERR] Lớp '$class' không tồn tại."; return; }
 
-    # Kiểm tra bài tập đã tồn tại chưa
-    if head -n1 "$file" | grep -q "$assignment"; then
-        echo "[ERR] Bài tập '$assignment' đã tồn tại trong lớp '$class'."
-        return
-    fi
-
-    # Thêm vào header
-    sed -i "1s/$/,$assignment/" "$file"
-
-    # Thêm điểm 0 cho mỗi sinh viên
-    tail -n +2 "$file" | while read -r line; do
-        echo "$line,0"
-    done > "$file.tmp"
-
-    # Ghép header + dữ liệu mới
-    head -n1 "$file" > "$file.new"
-    cat "$file.tmp" >> "$file.new"
-    mv "$file.new" "$file"
-    rm -f "$file.tmp"
-
-    echo "[OK] Đã thêm bài tập '$assignment' vào lớp '$class'."
+    for assignment in "$@"; do
+        local col=$(head -n1 "$file" | tr ',' '\n' | grep -n "^$assignment$" | cut -d: -f1)
+        [[ -z "$col" ]] && { echo "[ERR] Bài tập '$assignment' không có trong lớp '$class'."; continue; }
+        awk -F',' -v col="$col" '{
+            for(i=1;i<=NF;i++){if(i==1){printf "%s",$i}else if(i!=col){printf ",%s",$i}}; printf "\n"
+        }' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+        echo "[OK] Xóa bài tập '$assignment' khỏi lớp '$class'."
+    done
+    chmod 600 "$file"
 }
 
-# ==== Hàm: Xóa bài tập khỏi lớp ====
-remove_assignment_from_class() {
-    local class="$1"
-    local assignment="$2"
-    local file="$DATA_DIR/$class.csv"
-
-    if [[ ! -f "$file" ]]; then
-        echo "[ERR] Lớp '$class' không tồn tại."
-        return
-    fi
-
-    # Lấy số thứ tự cột
-    local col
-    col=$(head -n1 "$file" | tr ',' '\n' | grep -n "^$assignment$" | cut -d: -f1)
-
-    if [[ -z "$col" ]]; then
-        echo "[ERR] Không tìm thấy bài tập '$assignment' trong lớp '$class'."
-        return
-    fi
-
-    # Xóa cột bằng awk
-    awk -F',' -v col="$col" '{
-        for(i=1;i<=NF;i++){
-            if(i==1){printf "%s",$i}
-            else if(i!=col){printf ",%s",$i}
-        }
-        printf "\n"
-    }' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-
-    echo "[OK] Đã xóa bài tập '$assignment' khỏi lớp '$class'."
+# ==== Help ====
+show_help() {
+    echo "Usage: sudo $0 [OPTION] [ARGS...]"
+    echo
+    echo "Class operations:"
+    echo "  -ac <TênLớp>          Thêm lớp"
+    echo "  -dc <TênLớp>          Xóa lớp"
+    echo "  -lc                    Liệt kê lớp"
+    echo
+    echo "Student operations:"
+    echo "  -a <Lớp> <MãSV...|File|Pipe>   Thêm sinh viên"
+    echo "  -d <Lớp> <MãSV...|File|Pipe>   Xóa sinh viên"
+    echo "  -ls <Lớp>                       Liệt kê sinh viên lớp"
+    echo
+    echo "Assignment operations:"
+    echo "  -aa <TênBàiTập>       Thêm bài tập vào kho"
+    echo "  -da <TênBàiTập>       Xóa bài tập khỏi kho"
+    echo "  -la                    Liệt kê tất cả bài tập"
+    echo "  assign <Lớp> <TênBàiTập...|Pipe>    Giao bài tập cho lớp"
+    echo "  -ra <Lớp> <TênBàiTập...|Pipe>      Xóa bài tập khỏi lớp"
 }
 
 # ==== Main ====
+[[ $# -lt 1 ]] && { show_help; exit 1; }
+
 case "$1" in
-    add-class)
-        [[ $# -ne 2 ]] && { echo "Dùng: $0 add-class <TênLớp>"; exit 1; }
-        add_class "$2"
+    --help) show_help ;;
+    -ac) [[ $# -ne 2 ]] && { echo "[ERR] Thiếu TênLớp"; show_help; exit 1; }; add_class "$2" ;;
+    -dc) [[ $# -ne 2 ]] && { echo "[ERR] Thiếu TênLớp"; show_help; exit 1; }; delete_class "$2" ;;
+    -lc) list_classes ;;
+    -ls) [[ $# -ne 2 ]] && { echo "[ERR] Thiếu lớp"; show_help; exit 1; }; list_students_in_class "$2" ;;
+    -a)
+        shift; [[ $# -lt 2 ]] && { echo "[ERR] Thiếu lớp hoặc mã SV"; show_help; exit 1; }
+        CLASS="$1"; shift
+        if [[ $# -eq 1 && -f "$1" ]]; then add_student_to_class "$CLASS" $(cat "$1")
+        elif [[ $# -eq 0 && ! -t 0 ]]; then add_student_to_class "$CLASS" $(cat)
+        else add_student_to_class "$CLASS" "$@"; fi
         ;;
-    delete-class)
-        [[ $# -ne 2 ]] && { echo "Dùng: $0 delete-class <TênLớp>"; exit 1; }
-        delete_class "$2"
+    -d)
+        shift; [[ $# -lt 2 ]] && { echo "[ERR] Thiếu lớp hoặc mã SV"; show_help; exit 1; }
+        CLASS="$1"; shift
+        if [[ $# -eq 1 && -f "$1" ]]; then remove_student_from_class "$CLASS" $(cat "$1")
+        elif [[ $# -eq 0 && ! -t 0 ]]; then remove_student_from_class "$CLASS" $(cat)
+        else remove_student_from_class "$CLASS" "$@"; fi
         ;;
-    list-classes)
-        list_classes
+    -aa) [[ $# -ne 2 ]] && { echo "[ERR] Thiếu tên bài tập"; show_help; exit 1; }; add_assignment "$2" ;;
+    -da) [[ $# -ne 2 ]] && { echo "[ERR] Thiếu tên bài tập"; show_help; exit 1; }; remove_assignment "$2" ;;
+    -la) list_assignments ;;
+    assign)
+        [[ $# -lt 3 && -t 0 ]] && { echo "[ERR] Dùng: assign <Lớp> <TênBàiTập...|Pipe>"; show_help; exit 1; }
+        CLASS="$2"; shift 2
+        [[ $# -eq 0 && ! -t 0 ]] && assign_to_class "$CLASS" $(cat) || assign_to_class "$CLASS" "$@"
         ;;
-    add-student)
-        [[ $# -ne 3 ]] && { echo "Dùng: $0 add-student <Lớp> <MãSV>"; exit 1; }
-        add_student_to_class "$2" "$3"
+    -ra)
+        [[ $# -lt 3 && -t 0 ]] && { echo "[ERR] Dùng: -ra <Lớp> <TênBàiTập...|Pipe>"; show_help; exit 1; }
+        CLASS="$2"; shift 2
+        [[ $# -eq 0 && ! -t 0 ]] && remove_assignment_from_class "$CLASS" $(cat) || remove_assignment_from_class "$CLASS" "$@"
         ;;
-    remove-student)
-        [[ $# -ne 3 ]] && { echo "Dùng: $0 remove-student <Lớp> <MãSV>"; exit 1; }
-        remove_student_from_class "$2" "$3"
-        ;;
-    list-students)
-        [[ $# -ne 2 ]] && { echo "Dùng: $0 list-students <Lớp>"; exit 1; }
-        list_students_in_class "$2"
-        ;;
-    add-assignment)
-        [[ $# -ne 3 ]] && { echo "Dùng: $0 add-assignment <TênLớp> <TênBàiTập>"; exit 1; }
-        add_assignment_to_class "$2" "$3"
-        ;;
-    remove-assignment)
-        [[ $# -ne 3 ]] && { echo "Dùng: $0 remove-assignment <TênLớp> <TênBàiTập>"; exit 1; }
-        remove_assignment_from_class "$2" "$3"
-        ;;
-    *)
-        echo "Cách dùng:"
-        echo "  $0 add-class <TênLớp>"
-        echo "  $0 delete-class <TênLớp>"
-        echo "  $0 list-classes"
-        echo "  $0 add-student <Lớp> <MãSV>"
-        echo "  $0 remove-student <Lớp> <MãSV>"
-        echo "  $0 list-students <Lớp>"
-        echo "  $0 add-assignment <Lớp> <TênBàiTập>"
-        echo "  $0 remove-assignment <Lớp> <TênBàiTập>"
-        exit 1
-        ;;
+    *) echo "[ERR] Tham số không hợp lệ."; show_help; exit 1 ;;
 esac
 

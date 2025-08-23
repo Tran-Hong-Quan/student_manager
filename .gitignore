@@ -1,1 +1,3 @@
 data/
+bin/grading_server.log
+bin/grading_server.pid

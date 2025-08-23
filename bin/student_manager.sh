@@ -10,7 +10,7 @@ fi
 
 # ===== Thư mục gốc lưu sinh viên =====
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-BASE_HOME="$SCRIPT_DIR/../data/classes"
+BASE_HOME="$SCRIPT_DIR/../data/students"
 
 # ===== Hàm: Thêm 1 sinh viên =====
 add_student() {
@@ -26,31 +26,19 @@ add_student() {
 
     mkdir -p "$BASE_HOME" || { echo "[ERR] Không thể tạo thư mục gốc."; return; }
 
-    useradd -m -d "$USER_HOME" "$USERNAME"
+    useradd -m -d "$USER_HOME" -k /etc/skel -s /bin/bash "$USERNAME"
     if [[ $? -ne 0 ]]; then
         echo "[ERR] Không thể tạo user '$USERNAME'."
         return
     fi
 
+    cp -r /etc/skel/. "$USER_HOME/"
+    chown -R "$USERNAME:$USERNAME" "$USER_HOME"
+
     echo "$USERNAME:$PASSWORD" | chpasswd
     passwd -e "$USERNAME" >/dev/null
 
     echo "[OK] Đã tạo user '$USERNAME' (home: $USER_HOME)"
-}
-
-# ===== Hàm: Thêm nhiều sinh viên từ file =====
-add_students_batch() {
-    FILE="$1"
-
-    if [[ ! -f "$FILE" ]]; then
-        echo "[ERR] File '$FILE' không tồn tại."
-        return
-    fi
-
-    while read -r MASV; do
-        [[ -z "$MASV" ]] && continue
-        add_student "$MASV"
-    done < "$FILE"
 }
 
 # ===== Hàm: Xóa 1 sinh viên =====
@@ -67,21 +55,6 @@ delete_student() {
     echo "[OK] Đã xóa user '$USERNAME' và thư mục home."
 }
 
-# ===== Hàm: Xóa nhiều sinh viên từ file =====
-delete_students_batch() {
-    FILE="$1"
-
-    if [[ ! -f "$FILE" ]]; then
-        echo "[ERR] File '$FILE' không tồn tại."
-        return
-    fi
-
-    while read -r MASV; do
-        [[ -z "$MASV" ]] && continue
-        delete_student "$MASV"
-    done < "$FILE"
-}
-
 # ===== Hàm: Liệt kê sinh viên (full username) =====
 list_students() {
     awk -F: '$1 ~ /^SV-/ {print $1}' /etc/passwd
@@ -92,54 +65,82 @@ list_student_ids() {
     awk -F: '$1 ~ /^SV-/ {sub(/^SV-/, "", $1); print $1}' /etc/passwd
 }
 
+# ===== Hàm: Hiển thị hướng dẫn =====
+show_help() {
+    echo "Usage: sudo $0 [OPTION] [ARGS...]"
+    echo
+    echo "Options:"
+    echo "  -a <MãSV...|File>       Thêm sinh viên (1, nhiều, từ file hoặc pipe)"
+    echo "  -d <MãSV...|File>       Xóa sinh viên (1, nhiều, từ file hoặc pipe)"
+    echo "  -l                      Liệt kê tất cả username (SV-xxxx)"
+    echo "  -li                     Liệt kê chỉ mã sinh viên"
+    echo "  --help                  Hiển thị hướng dẫn này"
+    echo
+    echo "Examples:"
+    echo "  sudo $0 -a 12345 67890"
+    echo "  sudo $0 -a danhsach.txt"
+    echo "  cat danhsach.txt | sudo $0 -a"
+    echo "  sudo $0 -d 12345"
+    echo "  sudo $0 -li | sudo $0 -d"
+    echo "  sudo $0 -l"
+    echo "  sudo $0 -li"
+}
+
 # ===== Main =====
+if [[ $# -lt 1 ]]; then
+    show_help
+    exit 1
+fi
+
 case "$1" in
-    add)
-        # add <MãSV>
-        if [[ $# -ne 2 ]]; then
-            echo "Cách dùng: $0 add <MãSV>"
-            exit 1
-        fi
-        add_student "$2"
+    --help)
+        show_help
         ;;
-    add-batch)
-        # add-batch <FileDanhSach>
-        if [[ $# -ne 2 ]]; then
-            echo "Cách dùng: $0 add-batch <FileDanhSach>"
-            exit 1
+    -a)
+        shift
+        if [[ $# -eq 0 && ! -t 0 ]]; then
+            while read -r MASV; do
+                [[ -z "$MASV" ]] && continue
+                add_student "$MASV"
+            done
+        elif [[ $# -eq 1 && -f "$1" ]]; then
+            while read -r MASV; do
+                [[ -z "$MASV" ]] && continue
+                add_student "$MASV"
+            done < "$1"
+        else
+            for MASV in "$@"; do
+                add_student "$MASV"
+            done
         fi
-        add_students_batch "$2"
         ;;
-    delete)
-        # delete <MãSV>
-        if [[ $# -ne 2 ]]; then
-            echo "Cách dùng: $0 delete <MãSV>"
-            exit 1
+    -d)
+        shift
+        if [[ $# -eq 0 && ! -t 0 ]]; then
+            while read -r MASV; do
+                [[ -z "$MASV" ]] && continue
+                delete_student "$MASV"
+            done
+        elif [[ $# -eq 1 && -f "$1" ]]; then
+            while read -r MASV; do
+                [[ -z "$MASV" ]] && continue
+                delete_student "$MASV"
+            done < "$1"
+        else
+            for MASV in "$@"; do
+                delete_student "$MASV"
+            done
         fi
-        delete_student "$2"
         ;;
-    delete-batch)
-        # delete-batch <FileDanhSach>
-        if [[ $# -ne 2 ]]; then
-            echo "Cách dùng: $0 delete-batch <FileDanhSach>"
-            exit 1
-        fi
-        delete_students_batch "$2"
-        ;;
-    list)
+    -l)
         list_students
         ;;
-    list-id)
+    -li)
         list_student_ids
         ;;
     *)
-        echo "Cách dùng:"
-        echo "  $0 add <MãSV>             # Thêm 1 sinh viên"
-        echo "  $0 add-batch <File>       # Thêm nhiều sinh viên từ file"
-        echo "  $0 delete <MãSV>          # Xóa 1 sinh viên"
-        echo "  $0 delete-batch <File>    # Xóa nhiều sinh viên từ file"
-        echo "  $0 list                   # Liệt kê user (SV-xxxx)"
-        echo "  $0 list-id                # Liệt kê chỉ mã sinh viên"
+        echo "[ERR] Tham số không hợp lệ."
+        show_help
         exit 1
         ;;
 esac
