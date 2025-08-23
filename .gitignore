@@ -1,3 +1,4 @@
-data/
+data/classes
+data/students
 bin/grading_server.log
 bin/grading_server.pid
