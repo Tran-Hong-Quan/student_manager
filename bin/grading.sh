@@ -1,11 +1,11 @@
 #!/bin/bash
 # grading.sh
-# Usage: sudo ./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
+# Usage: ./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
 
 print_help() {
     cat <<EOF
 Usage:
-  sudo ./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
+  ./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
 
 Description:
   Script chấm bài tập cho sinh viên.
@@ -71,9 +71,9 @@ for i in "${!expected_outputs[@]}"; do
 
     # Chạy file sinh viên
     if [[ "$STUDENT_FILE" == *.sh ]]; then
-        actual=$("$STUDENT_FILE" "${args[@]}" 2>/dev/null)
+        actual=$("$STUDENT_FILE" "${args[@]}")
     else
-        actual=$("$STUDENT_FILE" "${args[@]}" 2>/dev/null)
+        actual=$("$STUDENT_FILE" "${args[@]}")
     fi
 
     # So sánh output, bỏ khoảng trắng đầu/cuối

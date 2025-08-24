@@ -1,12 +1,6 @@
 #!/bin/bash
 # class_manager.sh - Quản lý lớp học (CSV + assignments thư mục) với bảo mật chmod
 
-# ==== Kiểm tra quyền root ====
-if [[ $EUID -ne 0 ]]; then
-    echo "[ERR] Vui lòng chạy script với quyền root hoặc sudo."
-    exit 1
-fi
-
 # ==== Cấu hình ====
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="$SCRIPT_DIR/../data/classes"
@@ -147,7 +141,7 @@ remove_assignment_from_class() {
 
 # ==== Help ====
 show_help() {
-    echo "Usage: sudo $0 [OPTION] [ARGS...]"
+    echo "Usage: $0 [OPTION] [ARGS...]"a
     echo
     echo "Class operations:"
     echo "  -ac <TênLớp>          Thêm lớp"

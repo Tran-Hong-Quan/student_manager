@@ -1,2 +1,141 @@
-Nếu sinh viên không thể truy cập được vào thư mục của mình, hãy đảm bảo thư mục user của bạn có quyền chạy với tất cả mội người, nếu không có thể sinh lỗi, hoặc phải cho vào thư mục home của hệ thống
-Ví dụ chmod o+x /home/quan
+# Student Manager System
+
+Hệ thống quản lý sinh viên, lớp học và bài tập bằng shell script.  
+Toàn bộ script nằm trong thư mục `bin`.
+
+---
+
+## 📌 Chức năng chính
+- Thêm, xóa 1 hoặc nhiều sinh viên vào hệ thống
+- Thêm, xóa lớp học
+- Quản lý sinh viên trong lớp
+- Giao bài tập cho lớp học
+- Chấm điểm thủ công hoặc qua server chấm điểm
+- Sinh viên có thể SSH vào và nộp bài tập
+
+---
+
+## ⚙️ Quản lý sinh viên
+> **Lưu ý**: Bắt buộc chạy với `sudo` vì hệ thống sẽ tạo user thật trong máy.
+
+**Cách dùng**:
+```bash
+sudo ./bin/student_manager.sh [OPTION] [ARGS...]
+```
+
+**Options**:
+- `-a <MãSV...|File>` : Thêm sinh viên (1, nhiều, từ file hoặc pipe)
+- `-d <MãSV...|File>` : Xóa sinh viên (1, nhiều, từ file hoặc pipe)
+- `-l`                : Liệt kê tất cả username (SV-xxxx)
+- `-li`               : Liệt kê chỉ mã sinh viên
+- `--help`            : Hiển thị hướng dẫn
+
+**Ví dụ**:
+```bash
+sudo ./bin/student_manager.sh -a 12345 67890
+sudo ./bin/student_manager.sh -a danhsach.txt
+cat danhsach.txt | sudo ./bin/student_manager.sh -a
+sudo ./bin/student_manager.sh -d 12345
+sudo ./bin/student_manager.sh -li | sudo ./bin/student_manager.sh -d
+sudo ./bin/student_manager.sh -l
+sudo ./bin/student_manager.sh -li
+```
+
+---
+
+## 🏫 Quản lý lớp học & giao bài tập
+**Cách dùng**:
+```bash
+./bin/class_manager.sh [OPTION] [ARGS...]
+```
+
+### Quản lý lớp học
+- `-ac <TênLớp>` : Thêm lớp
+- `-dc <TênLớp>` : Xóa lớp
+- `-lc`          : Liệt kê danh sách lớp
+
+### Quản lý sinh viên trong lớp
+- `-a <Lớp> <MãSV...|File|Pipe>` : Thêm sinh viên vào lớp
+- `-d <Lớp> <MãSV...|File|Pipe>` : Xóa sinh viên khỏi lớp
+- `-ls <Lớp>`                    : Liệt kê sinh viên lớp và điểm bài tập
+
+### Quản lý bài tập
+- `-aa <TênBàiTập>` : Thêm bài tập vào kho
+- `-da <TênBàiTập>` : Xóa bài tập khỏi kho
+- `-la`             : Liệt kê tất cả bài tập
+- `assign <Lớp> <TênBàiTập...|Pipe>` : Giao bài tập cho lớp
+- `-ra <Lớp> <TênBàiTập...|Pipe>`   : Xóa bài tập khỏi lớp
+
+---
+
+## 📝 Chấm điểm
+Giáo viên có thể chấm điểm thủ công bằng script:
+
+**Cách dùng**:
+```bash
+./grading.sh <MãSV> <BàiTập> <FileBàiTậpSinhVien>
+```
+
+**Mô tả**:
+- `<MãSV>` : mã sinh viên (VD: 12345)
+- `<BàiTập>` : tên bài tập đã tạo trong hệ thống (`../data/assignments/<TênBàiTập>`)
+- `<FileBàiTậpSinhVien>` : file bài tập (.sh hoặc thực thi)
+
+**Quy trình**:
+1. Lấy input/output chuẩn từ `../data/assignments/<BàiTập>`
+2. Chạy bài nộp với input đó
+3. So sánh output với chuẩn → tính % số test đúng
+4. Ghi nhận điểm cao nhất vào lớp
+
+---
+
+## 🖥️ Server chấm điểm
+Sinh viên **không thể chạy trực tiếp** `grading.sh` vì script này thuộc quyền giảng viên.  
+Thay vào đó, cần chạy **server chấm điểm**:
+
+**Cách dùng**:
+```bash
+./student_manager/bin/server_ctl.sh {run|stop|status}
+```
+
+Sau khi server chạy, sinh viên có thể nộp bài tập.
+Để build lại server, dùng 
+gcc scripts/grading_server.c -o bin/grading_server.o
+
+---
+
+## 👨‍🎓 Hướng dẫn cho sinh viên
+- Sinh viên đăng nhập qua **SSH**:
+  ```bash
+  ssh SV-<MãSV>@<server>
+  ```
+  - Username: `SV-<MãSV>`
+  - Mật khẩu mặc định: trùng với username
+
+- Nộp bài tập:
+  ```bash
+  ../../../bin/submit_assignment.sh <TênBàiTập> <LệnhFileSinhVien>
+  ```
+  Nếu bài tập không yêu cầu đối số → hệ thống chỉ chạy 1 lần duy nhất.
+  Sinh viên phải đảm bảo file có quyền thực thi với file
+
+**Ví dụ**:
+```bash
+../../../bin/submit_assignment.sh SUM ./sum.sh
+```
+
+---
+
+## 📂 Cấu trúc dữ liệu
+- `../data/classes/` : Thông tin lớp học và điểm
+- `../data/assignments/` : Bài tập, input/output chuẩn
+- `../data/students/` : Danh sách sinh viên
+
+---
+
+## ✅ Tổng kết
+Hệ thống cung cấp:
+- Quản lý sinh viên (thêm, xóa, liệt kê)
+- Quản lý lớp học & bài tập
+- Hệ thống chấm điểm tự động/thủ công
+- Sinh viên nộp bài trực tiếp qua SSH

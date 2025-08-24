@@ -25,6 +25,7 @@ add_student() {
     fi
 
     mkdir -p "$BASE_HOME" || { echo "[ERR] Không thể tạo thư mục gốc."; return; }
+    chown $SUDO_USER:$SUDO_USER "$BASE_HOME"
 
     useradd -m -d "$USER_HOME" -k /etc/skel -s /bin/bash "$USERNAME"
     if [[ $? -ne 0 ]]; then
