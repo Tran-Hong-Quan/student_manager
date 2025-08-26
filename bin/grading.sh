@@ -51,7 +51,11 @@ if [[ ! -f "$OUTPUT_FILE" ]]; then
 fi
 
 # ==== Đọc test cases ====
-mapfile -t inputs < "$INPUT_FILE"
+if [[ -f "$INPUT_FILE" ]]; then
+    mapfile -t inputs < "$INPUT_FILE"
+else
+    inputs=()
+fi
 mapfile -t expected_outputs < "$OUTPUT_FILE"
 
 TOTAL=${#expected_outputs[@]}
