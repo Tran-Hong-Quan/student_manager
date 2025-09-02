@@ -189,6 +189,6 @@ $(pwd)/../../../bin/submit_assignment.sh SUM ./sum.sh
 
 ## 6. 🗄️ Cấu trúc dữ liệu
 
--   `../data/classes/`: Thông tin lớp và điểm số.
--   `../data/assignments/`: Kho bài tập, gồm input & output chuẩn.
--   `../data/students/`: Danh sách thông tin sinh viên.
+-   `student_manager/data/classes/`: Thông tin lớp và điểm số.
+-   `student_manager/data/assignments/`: Kho bài tập, gồm input & output chuẩn.
+-   `student_manager/data/students/`: Danh sách thông tin sinh viên.
