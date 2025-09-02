@@ -182,7 +182,7 @@ $(pwd)/../../../bin/submit_assignment.sh <TênBT> <LệnhThựcThiFileNộp>
 **Ví dụ:**
 
 ``` bash
-../../../bin/submit_assignment.sh SUM ./sum.sh
+$(pwd)/../../../bin/submit_assignment.sh SUM ./sum.sh
 ```
 
 ------------------------------------------------------------------------
