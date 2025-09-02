@@ -45,6 +45,16 @@ Hệ thống yêu cầu **SSH server** có thể kết nối từ bên ngoài.\
 Nếu SSH đang chỉ lắng nghe trên `127.0.0.1`, bạn cần chỉnh sửa file cấu
 hình.
 
+**Cài SSH:**
+``` bash
+sudo apt update
+sudo apt install openssh-server
+```
+Khởi động lại dịch vụ SSH
+``` bash
+sudo systemctl restart sshd
+```
+
 **Kiểm tra trạng thái SSH:**
 
 ``` bash
