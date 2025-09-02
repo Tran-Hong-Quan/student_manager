@@ -134,12 +134,22 @@ Sử dụng script:
 
 ------------------------------------------------------------------------
 
+## Lưu ý chức năng nộp bài tập tự động:
+Trước khi có thể dùng được chức năng này, giảng viên cần cấp quyền thư thi với tất cả mọi người file submit_assignment.sh
+``` bash
+chmod +x student_manager/bin/submit_assignment.sh
+```
+Giảng viên cũng cần cái Socat để chạy Server
+``` bash
+sudo apt install socat
+```
+
 ## 💻 Server chấm điểm tự động
 
 Quản lý server:
 
 ``` bash
-./student_manager/bin/server_ctl.sh {run|stop|status}
+sudo ./student_manager/bin/server_ctl.sh {run|stop|status}
 ```
 
 Build lại server sau khi chỉnh sửa mã nguồn C:
@@ -147,7 +157,6 @@ Build lại server sau khi chỉnh sửa mã nguồn C:
 ``` bash
 gcc student_manager/scripts/grading_server.c -o student_manager/bin/grading_server.o
 ```
-
 ------------------------------------------------------------------------
 
 ## 🎓5.  Hướng dẫn cho sinh viên
@@ -161,12 +170,6 @@ gcc student_manager/scripts/grading_server.c -o student_manager/bin/grading_serv
 
 ``` bash
 ssh SV-<MãSV>@<server>
-```
-
-## Lưu ý chức năng nộp bài tập:
-Trước khi có thể dùng được chức năng này, giảng viên cần cấp quyền thư thi với tất cả mọi người file submit_assignment.sh
-``` bash
-chmod +x student_manager/bin/submit_assignment.sh
 ```
 
 ### Nộp bài tập
