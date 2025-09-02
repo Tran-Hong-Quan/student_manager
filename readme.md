@@ -55,37 +55,9 @@ Khởi động lại dịch vụ SSH
 sudo systemctl restart sshd
 ```
 
-**Kiểm tra trạng thái SSH:**
-
-``` bash
-ss -tnlp | grep ssh
-```
-
-Nếu kết quả hiển thị `127.0.0.1`, hãy chỉnh sửa file cấu hình:
-
-``` bash
-sudo nano /etc/ssh/sshd_config
-```
-
-Tìm dòng:
-
-    ListenAddress 127.0.0.1
-
-Và sửa thành:
-
-    ListenAddress 0.0.0.0
-
-Nếu dòng bị chú thích `#`, hãy bỏ dấu `#`.
-
-**Khởi động lại SSH:**
-
-``` bash
-sudo systemctl restart ssh
-```
-
 ------------------------------------------------------------------------
 
-## 👨‍🏫 Hướng dẫn sử dụng cho giáo viên
+## 4. 👨‍🏫 Hướng dẫn sử dụng cho giáo viên
 
 ### Quản lý sinh viên
 
@@ -178,7 +150,7 @@ gcc scripts/grading_server.c -o bin/grading_server.o
 
 ------------------------------------------------------------------------
 
-## 🎓 Hướng dẫn cho sinh viên
+## 🎓5.  Hướng dẫn cho sinh viên
 
 ### Đăng nhập SSH
 
@@ -207,7 +179,7 @@ ssh SV-<MãSV>@<server>
 
 ------------------------------------------------------------------------
 
-## 🗄️ Cấu trúc dữ liệu
+## 6. 🗄️ Cấu trúc dữ liệu
 
 -   `../data/classes/`: Thông tin lớp và điểm số.
 -   `../data/assignments/`: Kho bài tập, gồm input & output chuẩn.
