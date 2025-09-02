@@ -64,7 +64,7 @@ sudo systemctl restart sshd
 Sử dụng script:
 
 ``` bash
-sudo ./bin/student_manager.sh [OPTION] [ARGS...]
+sudo ./student_manager/bin/student_manager.sh [OPTION] [ARGS...]
 ```
 
 ⚠️ **Lưu ý**: Bắt buộc chạy với `sudo` vì script sẽ tạo user thực trên
@@ -82,13 +82,13 @@ hệ thống.
 
 ``` bash
 # Thêm sinh viên 12345 và 67890
-sudo ./bin/student_manager.sh -a 12345 67890
+sudo ./student_manager/bin/student_manager.sh -a 12345 67890
 
 # Thêm sinh viên từ file
-sudo ./bin/student_manager.sh -a danhsach.txt
+sudo ./student_manager/bin/student_manager.sh -a danhsach.txt
 
 # Xóa sinh viên
-sudo ./bin/student_manager.sh -d 12345
+sudo ./student_manager/bin/student_manager.sh -d 12345
 ```
 
 ------------------------------------------------------------------------
@@ -125,7 +125,7 @@ Sử dụng script:
 Sử dụng script:
 
 ``` bash
-./grading.sh <MãSV> <TênBT> <FileNộpCủaSV>
+./student_manager/bin/grading.sh <MãSV> <TênBT> <FileNộpCủaSV>
 ```
 
 -   `<MãSV>`: Mã số sinh viên (VD: `12345`).
@@ -139,18 +139,20 @@ Sử dụng script:
 Quản lý server:
 
 ``` bash
-./bin/server_ctl.sh {run|stop|status}
+./student_manager/bin/server_ctl.sh {run|stop|status}
 ```
 
 Build lại server sau khi chỉnh sửa mã nguồn C:
 
 ``` bash
-gcc scripts/grading_server.c -o bin/grading_server.o
+gcc student_manager/scripts/grading_server.c -o student_manager/bin/grading_server.o
 ```
 
 ------------------------------------------------------------------------
 
 ## 🎓5.  Hướng dẫn cho sinh viên
+
+
 
 ### Đăng nhập SSH
 
@@ -161,10 +163,16 @@ gcc scripts/grading_server.c -o bin/grading_server.o
 ssh SV-<MãSV>@<server>
 ```
 
+## Lưu ý chức năng nộp bài tập:
+Trước khi có thể dùng được chức năng này, giảng viên cần cấp quyền thư thi với tất cả mọi người file submit_assignment.sh
+``` bash
+chmod +x student_manager/bin/submit_assignment.sh
+```
+
 ### Nộp bài tập
 
 ``` bash
-../../../bin/submit_assignment.sh <TênBT> <LệnhThựcThiFileNộp>
+$(pwd)/../../../bin/submit_assignment.sh <TênBT> <LệnhThựcThiFileNộp>
 ```
 
 -   `<TênBT>`: Tên bài tập được giao.
