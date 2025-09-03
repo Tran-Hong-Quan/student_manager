@@ -74,10 +74,12 @@ for i in "${!expected_outputs[@]}"; do
     read -r -a args <<< "$input_line"
 
     # Chạy file sinh viên
-    if [[ "$STUDENT_FILE" == *.sh ]]; then
-        actual=$("$STUDENT_FILE" "${args[@]}")
-    else
-        actual=$("$STUDENT_FILE" "${args[@]}")
+    actual=$(timeout 2s "$STUDENT_FILE" "${args[@]}" 2>&1)
+
+    if [[ $? -eq 124 ]]; then
+        echo "[WARN] Bài của $MASV vượt quá thời gian ở test $i"
+        CORRECt=0
+        break
     fi
 
     # So sánh output, bỏ khoảng trắng đầu/cuối

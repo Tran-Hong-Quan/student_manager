@@ -6,34 +6,46 @@
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <signal.h>
 
 #define BUFFER_SIZE 1024
+
+void handle_client(int client_fd, const char *grading_path, const char *buffer) {
+    char cmd[BUFFER_SIZE * 2];
+    snprintf(cmd, sizeof(cmd), "timeout 5s sudo %s %s", grading_path, buffer);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        char *err = "Error: cannot execute grading script.\n";
+        write(client_fd, err, strlen(err));
+        close(client_fd);
+        return;
+    }
+
+    char result[BUFFER_SIZE];
+    while (fgets(result, sizeof(result), fp) != NULL) {
+        write(client_fd, result, strlen(result));
+    }
+    pclose(fp);
+
+    close(client_fd);
+}
 
 int main(int argc, char *argv[]) {
     int server_fd, client_fd;
     struct sockaddr_un addr;
     char buffer[BUFFER_SIZE];
 
-    // Tính thư mục script
+    // --- Đường dẫn ---
     char script_dir[BUFFER_SIZE];
     strncpy(script_dir, argv[0], BUFFER_SIZE-1);
     script_dir[BUFFER_SIZE-1] = '\0';
-    dirname(script_dir); // lấy thư mục chứa script
+    dirname(script_dir);
 
-    // Socket path: ../data/tmp/grading_socket
     char socket_path[BUFFER_SIZE];
     snprintf(socket_path, BUFFER_SIZE, "%s/../data/tmp/grading_socket", script_dir);
 
-    // Tạo thư mục nếu chưa tồn tại
-    char tmp_dir[BUFFER_SIZE];
-    strncpy(tmp_dir, socket_path, BUFFER_SIZE-1);
-    tmp_dir[BUFFER_SIZE-1] = '\0';
-    char *last_slash = strrchr(tmp_dir, '/');
-    if (last_slash) *last_slash = '\0';
-    mkdir(tmp_dir, 0777); // tạo nếu chưa có
-
-    // Xoá socket cũ nếu tồn tại
-    unlink(socket_path);
+    unlink(socket_path); // xoá socket cũ
 
     if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
         perror("socket");
@@ -43,11 +55,6 @@ int main(int argc, char *argv[]) {
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
-    
-    char cmd[BUFFER_SIZE * 2];
-    char grading_path[BUFFER_SIZE];
-    
-    snprintf(grading_path, sizeof(grading_path), "%s/grading.sh", script_dir);
 
     if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("bind");
@@ -64,8 +71,13 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    // tránh zombie process
+    signal(SIGCHLD, SIG_IGN);
+
     printf("Grading server started. Listening on %s...\n", socket_path);
-    printf("ffaf\n");
+
+    char grading_path[BUFFER_SIZE];
+    snprintf(grading_path, sizeof(grading_path), "%s/grading.sh", script_dir);
 
     while (1) {
         if ((client_fd = accept(server_fd, NULL, NULL)) < 0) {
@@ -73,38 +85,32 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        memset(buffer, 0, BUFFER_SIZE);
         int n = read(client_fd, buffer, BUFFER_SIZE - 1);
         if (n <= 0) {
             close(client_fd);
             continue;
         }
-
         buffer[n] = '\0';
+
         printf("[DEBUG] Received request: %s\n", buffer);
 
-        char cmd[BUFFER_SIZE * 2];
-        snprintf(cmd, sizeof(cmd), "sudo %s %s", grading_path, buffer);
-
-        FILE *fp = popen(cmd, "r");
-        if (!fp) {
-            char *err = "Error: cannot execute grading script.\n";
-            write(client_fd, err, strlen(err));
+        pid_t pid = fork();
+        if (pid == 0) {
+            // tiến trình con
+            close(server_fd); // con không cần socket server
+            handle_client(client_fd, grading_path, buffer);
+            exit(0);
+        } else if (pid > 0) {
+            // tiến trình cha
+            close(client_fd); // cha không cần client_fd
+        } else {
+            perror("fork");
             close(client_fd);
-            continue;
         }
-
-        char result[BUFFER_SIZE];
-        while (fgets(result, sizeof(result), fp) != NULL) {
-            write(client_fd, result, strlen(result));
-        }
-        pclose(fp);
-
-        close(client_fd);
     }
 
     close(server_fd);
     unlink(socket_path);
+    printf("Server closed\n");
     return 0;
 }
-
