@@ -200,6 +200,6 @@ $(pwd)/../../../bin/submit_assignment.sh SUM ./sum.sh
 
 ## 7. Hạn chế cần bổ sung
 
--   ~~Chưa có cơ chế kiểm tra script chạy quá lâu (timeout), sinh viên nếu nộp bài chạy mãi mãi (ví dụ bài while(true){}) có thể làm dừng server ~~
+- ~~Chưa có cơ chế kiểm tra script chạy quá lâu (timeout), sinh viên nếu nộp bài chạy mãi mãi (ví dụ bài while(true){}) có thể làm dừng server~~
 -   Chưa có cơ chế check đạo văn, không thể phân biệt được bài tập giống hệt nhau
 -   Input/Output đơn giản và chỉ theo dòng trong bài tập
