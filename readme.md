@@ -135,7 +135,7 @@ Sử dụng script:
 ------------------------------------------------------------------------
 
 ## Lưu ý chức năng nộp bài tập tự động:
-Trước khi có thể dùng được chức năng này, giảng viên cần cấp quyền thư thi với tất cả mọi người file submit_assignment.sh
+Trước khi có thể dùng được chức năng này, giảng viên cần cấp quyền thực thi với tất cả mọi người file submit_assignment.sh
 ``` bash
 chmod +x student_manager/bin/submit_assignment.sh
 ```
@@ -195,3 +195,8 @@ $(pwd)/../../../bin/submit_assignment.sh SUM ./sum.sh
 -   `student_manager/data/classes/`: Thông tin lớp và điểm số.
 -   `student_manager/data/assignments/`: Kho bài tập, gồm input & output chuẩn.
 -   `student_manager/data/students/`: Danh sách thông tin sinh viên.
+
+## 7. Hạn chế cần bổ sung
+
+-   Chưa có cơ chế kiểm tra script chạy quá lâu (timeout), sinh viên nếu nộp bài chạy mãi mãi (ví dụ bài while(true){}) có thể làm dừng server
+-   Chưa có cơ chế check đạo văn, không thể phân biệt được bài tập giống hệt nhau
